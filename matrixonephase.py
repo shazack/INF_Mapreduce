@@ -1,45 +1,40 @@
 # -*- coding: utf-8 -*- 
 import MapReduce
 import sys
-import re
-import string
-from collections import Counter
+import itertools
 
 mr = MapReduce.MapReduce()
 
 def mapper(record):
-    # key: document identifier
-    # value: document contents
-    doc = str(record[0])
-    value =str(record[1])
-    words = value.split()
+        #Assigning the values of the sparse matrix to i,j and the value to A[ij]
+	i = record[0]
+        j = record[1]
+        aij = record[2]
+	
+	#emitting values from each column in B for each value in A and vice versa for B 
+        for k in range(5):
+	 	 mr.emit_intermediate((i, k), ('A',j, aij))   
+		 mr.emit_intermediate((k,j), ('B', i, aij))
 
-    #Matching each word with a regular expression to check for only alpha numeric characters
-    for w in words:
-	match = re.match(r'^[A-Za-z0-9 ]*$', w )
-	if match:
-		#converting all the words into lower string
-      		w=w.lower()
-    		mr.emit_intermediate(w,doc)
-   
+	
+def reducer(key, values):
+   	a={}
+	b={}
+	sum=0
+	#Checking the list 'values' to multiply the corresponding values of A and B when the values of j are equal and then sum
+	for v1,v2,v3 in values:
+	        if v1 =='A':
+        	        a[v2]=v3
+        	else:
+                	b[v2]=v3
+	#Here k1 and k2 are the keys representing j in A and B 
+	for k1,val1 in a.iteritems():
+		for k2,val2 in b.iteritems():
+			if k1==k2:
+				sum= sum + val1*val2 
+	mr.emit((key[0],key[1],sum))
 
-def reducer(key, list_of_values):
-    # key: word
-    # value: List of documents in which the word is present
-    tf=0
-    df=0
-    tf1=[]
-
-    #counting the occurrences of each document in the list 
-    tf=Counter(list_of_values)
-
-    #converting the dictionary of document:value into a list(document,value) to find term frequency in the form of a list
-    tf1=[(k,v) for k,v in tf.items()]  
-
-    # Finding the Document frequency
-    df=len(tf)
-    mr.emit((key,df,tf1))
 
 if __name__ == '__main__':
-  inputdata = open(sys.argv[1])
-  mr.execute(inputdata, mapper, reducer)
+    inputdata = open(sys.argv[1])
+    mr.execute(inputdata, mapper, reducer)
